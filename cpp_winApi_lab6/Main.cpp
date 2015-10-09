@@ -34,15 +34,15 @@ HWND hSqr, hRev, hDiv, hMult, hSub, hAdd, hEqual, hDivE, hMultE, hSubE, hAddE, h
 
 Op op1;
 Op curOp;
-int curOperator; 
+int curOperator; //current operator
 			/*
 			1:/
 			2:*
 			3:-
 			4:+
 			*/
-WCHAR curOpNomText[MAX_ENTER_LENGTH+1], curOpDenomText[MAX_ENTER_LENGTH + 1];
-WCHAR editText[MAX_LENGTH+1];
+WCHAR curOpNomText[MAX_LENGTH+1], curOpDenomText[MAX_LENGTH + 1];
+WCHAR editText[MAX_LENGTH*2];
 
 int state;    // 1 - operand1, 2 - operator, 3 - operand2, 4 - =
 bool curOpState;   // 0 - nominator, 1 - denominator
@@ -82,7 +82,7 @@ void SetEditText() {
 	else
 		SetStr(editText, L"-");
 
-	if (!curOpState) {
+	if (!curOpState && wcslen(curOpDenomText)==0) {
 		AddStr(editText, curOpNomText);
 	}
 	else {
@@ -152,6 +152,7 @@ void AddDigit(int digit) {
 	case 4:
 		state = 1;
 		Clear();
+		AddDigit(digit);
 		break;
 	default:
 		break;
@@ -165,28 +166,32 @@ void Copy(Op &source, Op &target) {
 	target.sign = source.sign;
 }
 
-void Div() {
-
+void Div(Op& op1, Op& op2) {
+	op1.nom *= op2.denom;
+	op1.denom *= op2.nom;
+	op1.sign *= op2.sign;
 }
 
 void Mult(Op& op1, Op& op2) {
 	op1.nom *= op2.nom;
 	op1.denom *= op2.denom;
 	op1.sign *= op2.sign;
-	Copy(op1, op2);
 }
 
-void Add() {
+void Add(Op& op1, Op& op2) {
 
 }
 
-void Sub() {
+void Sub(Op& op1, Op& op2) {
 
 }
 
 void SetCurOp() {
 	curOp.nom = _ttoi(curOpNomText);
-	curOp.denom = _ttoi(curOpDenomText);
+	int i = _ttoi(curOpDenomText);
+	if (i == 0)
+		curOp.denom = 1;
+	else curOp.denom = i;
 }
 
 void SetTextCurOp() {
@@ -200,12 +205,22 @@ void Equal() {
 		SetCurOp();
 		switch (curOperator)
 		{
+		case 1:
+			Div(op1, curOp);
+			break;
 		case 2:
 			Mult(op1, curOp);
+			break;
+		case 3:
+			Sub(op1, curOp);
+			break;
+		case 4:
+			Add(op1, curOp);
 			break;
 		default:
 			break;
 		}
+		Copy(op1, curOp);
 		SetTextCurOp();
 		SetEditText();
 	}
@@ -220,9 +235,19 @@ void SetOperator(int i) {
 		Copy(curOp,op1);
 		ClearCurOp();
 		curOperator = i;
+		break;
 	case 2:
+		curOperator = i;
+		break;
 	case 3:
+		Equal();
+		state = 1;
+		SetOperator(i);
+		break;
 	case 4:
+		state = 1;
+		SetOperator(i);
+		break;
 	default:
 		break;
 	}
@@ -371,11 +396,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	}
 	case WM_CREATE:
 		SetComponents(hWnd);
-		/*SetStr(curOpNomText, L"HELLO");*/
-		//SetStr(curOpNomText, L"123");
-		Init();
-		/*SetText();*/
-		
+		Init();	
 		break;
 	case WM_PAINT:
 		hDc = BeginPaint(hWnd, &ps);
@@ -438,7 +459,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 
 		if (lParam == (LPARAM)hDiv) {
-			if (state == 1 || state == 3) {
+			if ((state == 1 || state == 3) && (!curOpState)) {
 				curOpState = true;
 				SetEditText();
 			}
@@ -448,12 +469,35 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		if (lParam == (LPARAM)hMult) {
 			SetOperator(2);
 		}
-
+		if (lParam == (LPARAM)hSub) {
+			SetOperator(3);
+		}
+		if (lParam == (LPARAM)hAdd) {
+			SetOperator(4);
+		}
 		if (lParam == (LPARAM)hEqual) {
 			Equal();
 		}
 
-		//mem buttons click
+		//delete buttons clicks
+
+		if (lParam == (LPARAM)hCe) {
+			ClearCurOp();
+		}
+		if (lParam == (LPARAM)hC) {
+			Clear();
+		}
+		if (lParam == (LPARAM)hBs) {
+			if (!curOpState) {
+				int i = wcslen(curOpNomText);
+				if (i > 0) curOpNomText[i - 1] = 0;
+				if (i == 1) curOpNomText[0] = '0';
+				SetEditText();
+			}
+		
+		}
+
+		//mem buttons clicks
 
 		if (lParam == (LPARAM)hMc) {
 			/*memIsEmpty = true;
