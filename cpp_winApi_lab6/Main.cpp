@@ -57,6 +57,10 @@ void SetStr(WCHAR *str, WCHAR *s) {
 	wsprintf(str, TEXT("%s"), s);
 }
 
+void SetStr(WCHAR *str, int i) {
+	wsprintf(str, TEXT("%d"), i);
+}
+
 void AddStr(WCHAR *str, WCHAR *c) {
 	wsprintf(str, TEXT("%s%s"), str, c);
 }
@@ -91,12 +95,17 @@ void SetEditText() {
 
 bool canAddDigit(int digit) {
 	if (!curOpState) {
-
+		int i = wcslen(curOpNomText);
+		if (i < MAX_ENTER_LENGTH)
+			return true;
+		return false;
 	}
 	else {
-
+		int i = wcslen(curOpDenomText);
+		if (i < MAX_ENTER_LENGTH && (i>0 || digit!=0))
+			return true;
+		return false;
 	}
-	return true;
 }
 
 
@@ -148,6 +157,75 @@ void AddDigit(int digit) {
 		break;
 	}
 	SetEditText();
+}
+
+void Copy(Op &source, Op &target) {
+	target.nom = source.nom;
+	target.denom = source.denom;
+	target.sign = source.sign;
+}
+
+void Div() {
+
+}
+
+void Mult(Op& op1, Op& op2) {
+	op1.nom *= op2.nom;
+	op1.denom *= op2.denom;
+	op1.sign *= op2.sign;
+	Copy(op1, op2);
+}
+
+void Add() {
+
+}
+
+void Sub() {
+
+}
+
+void SetCurOp() {
+	curOp.nom = _ttoi(curOpNomText);
+	curOp.denom = _ttoi(curOpDenomText);
+}
+
+void SetTextCurOp() {
+	SetStr(curOpNomText, curOp.nom);
+	SetStr(curOpDenomText, curOp.denom);
+}
+
+void Equal() {
+	if (state == 3 || state == 4) {
+		state = 4;
+		SetCurOp();
+		switch (curOperator)
+		{
+		case 2:
+			Mult(op1, curOp);
+			break;
+		default:
+			break;
+		}
+		SetTextCurOp();
+		SetEditText();
+	}
+}
+
+void SetOperator(int i) {
+	switch (state)
+	{
+	case 1:
+		state = 2;
+		SetCurOp();
+		Copy(curOp,op1);
+		ClearCurOp();
+		curOperator = i;
+	case 2:
+	case 3:
+	case 4:
+	default:
+		break;
+	}
 }
 
 
@@ -357,6 +435,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			if (_ttoi(curOpNomText) != 0)
 				curOp.sign *= -1;
 			SetEditText();
+		}
+
+		if (lParam == (LPARAM)hDiv) {
+			if (state == 1 || state == 3) {
+				curOpState = true;
+				SetEditText();
+			}
+			else SetOperator(1);
+		}
+
+		if (lParam == (LPARAM)hMult) {
+			SetOperator(2);
+		}
+
+		if (lParam == (LPARAM)hEqual) {
+			Equal();
 		}
 
 		//mem buttons click
