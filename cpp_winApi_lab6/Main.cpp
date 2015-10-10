@@ -166,6 +166,25 @@ void Copy(Op &source, Op &target) {
 	target.sign = source.sign;
 }
 
+int GCD(int a, int b) {     // greatest common divisor
+	while (b != 0) {
+		int tmp = a%b;
+		a = b;
+		b = tmp;
+	}
+	return a;
+}
+
+void TryToCancel(Op &op) {                
+	int i = GCD(op.nom, op.denom);
+	op.nom /= i;
+	op.denom /= i;
+}
+
+int ICM(int a, int b) {               // least common multiple
+	return (a*b) / GCD(a, b);
+}
+
 void Div(Op& op1, Op& op2) {
 	op1.nom *= op2.denom;
 	op1.denom *= op2.nom;
@@ -179,11 +198,22 @@ void Mult(Op& op1, Op& op2) {
 }
 
 void Add(Op& op1, Op& op2) {
-
+	int i = ICM(op1.denom, op2.denom);
+	int buf1 = i / op1.denom;
+	int buf2 = i / op2.denom;
+	op1.nom = op1.nom*buf1*op1.sign + op2.nom*buf2*op2.sign;
+	if (op1.nom >= 0) 
+		op1.sign = 1;
+	else  {
+		op1.sign = -1;
+		op1.nom = abs(op1.nom);
+	}
+	op1.denom = i;
 }
 
 void Sub(Op& op1, Op& op2) {
-
+	op2.sign *= -1;
+	Add(op1, op2);
 }
 
 void SetCurOp() {
@@ -200,7 +230,7 @@ void SetTextCurOp() {
 }
 
 void Equal() {
-	if (state == 3 || state == 4) {
+	if (state!=1) {
 		state = 4;
 		SetCurOp();
 		switch (curOperator)
@@ -220,6 +250,7 @@ void Equal() {
 		default:
 			break;
 		}
+		TryToCancel(op1);
 		Copy(op1, curOp);
 		SetTextCurOp();
 		SetEditText();
@@ -397,6 +428,8 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		SetComponents(hWnd);
 		Init();	
+		/*wsprintf(curOpNomText, TEXT("%d"), INT_MAX);
+		SetEditText();*/
 		break;
 	case WM_PAINT:
 		hDc = BeginPaint(hWnd, &ps);
@@ -477,6 +510,24 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (lParam == (LPARAM)hEqual) {
 			Equal();
+		}
+		if (lParam == (LPARAM)hSqr) {
+			SetCurOp();
+			curOp.nom *= curOp.nom;
+			curOp.denom *= curOp.denom;
+			curOp.sign *= curOp.sign;
+			SetTextCurOp();
+			SetEditText();
+		}
+		if (lParam == (LPARAM)hRev) {
+			if (wcslen(curOpDenomText) > 0)
+			{
+				WCHAR buf[MAX_LENGTH*2];
+				SetStr(buf, curOpNomText);
+				SetStr(curOpNomText, curOpDenomText);
+				SetStr(curOpDenomText, buf);
+				SetEditText();
+			}
 		}
 
 		//delete buttons clicks
