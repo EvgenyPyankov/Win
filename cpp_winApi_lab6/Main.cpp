@@ -26,7 +26,7 @@ const int MAX_LENGTH = MAX_ENTER_LENGTH*2;     // max number of digits in nomina
 
 HWND hWnd;
 HWND hEdit;
-HWND hMEdit;
+HWND hMEdit, hErrorEdit;
 HWND hBtns[10];
 HWND hMc, hMs, hMr, hMplus;
 HWND hCe, hC, hBs;
@@ -131,6 +131,7 @@ void Clear() {
 
 void Init() {
 	Clear();
+	memIsEmpty = true;
 }
 
 void AddDigit(int digit) {
@@ -292,6 +293,7 @@ void SetComponents(HWND hWnd) {
 	SendMessage(hEdit, WM_SETFONT, WPARAM(hFont), TRUE);
 
 	hMEdit = CreateWindow(L"edit", L"", WS_CHILD | WS_VISIBLE, MARGIN, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT, 20, 20, hWnd, 0, hInst, NULL);
+	hErrorEdit = CreateWindow(L"edit", L"", WS_CHILD | WS_VISIBLE, MARGIN, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT+20, 20, 20, hWnd, 0, hInst, NULL);
 
 	//memory keys
 
@@ -401,10 +403,6 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	}
 	return (int)msg.wParam;
 }
-
-
-
-
 
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
@@ -520,14 +518,39 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			SetEditText();
 		}
 		if (lParam == (LPARAM)hRev) {
-			if (wcslen(curOpDenomText) > 0)
-			{
+			if (wcslen(curOpDenomText) == 0) SetStr(curOpDenomText, L"1");
 				WCHAR buf[MAX_LENGTH*2];
 				SetStr(buf, curOpNomText);
 				SetStr(curOpNomText, curOpDenomText);
 				SetStr(curOpDenomText, buf);
 				SetEditText();
+		}
+		if (lParam == (LPARAM)hDivE) {
+			if (curOpNomText[0] != '0') {
+				SetStr(curOpNomText, L"1");
+				SetStr(curOpDenomText, L"1");
+				SetEditText();
 			}
+		}
+
+		if (lParam == (LPARAM)hMultE) {
+			SetCurOp();
+			Mult(curOp, curOp);
+			TryToCancel(curOp);
+			SetTextCurOp();
+			SetEditText();
+		}
+		if (lParam == (LPARAM)hSubE) {
+			SetStr(curOpNomText, L"0");
+			SetStr(curOpDenomText, L"1");
+			SetEditText();
+		}
+		if (lParam == (LPARAM)hAddE) {
+			SetCurOp();
+			Add(curOp, curOp);
+			TryToCancel(curOp);
+			SetTextCurOp();
+			SetEditText();
 		}
 
 		//delete buttons clicks
@@ -545,26 +568,41 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				if (i == 1) curOpNomText[0] = '0';
 				SetEditText();
 			}
+			else {
+				int i = wcslen(curOpDenomText);
+				if (i > 0) curOpDenomText[i - 1] = 0;
+				if (i == 1) curOpNomText[0] = '0';
+				SetEditText();
+			}
 		
 		}
 
 		//mem buttons clicks
 
 		if (lParam == (LPARAM)hMc) {
-			/*memIsEmpty = true;
-			memNom = 0;
-			memDenom = 1;*/
+			memIsEmpty = true;
+			ClearOp(memOp);
+			SetWindowText(hMEdit, L"");
 		}
 		if (lParam == (LPARAM)hMs) {
-			/*memIsEmpty = false;
-			memNom = curOpNom;
-			memDenom = curOpDenom;*/
+			memIsEmpty = false;
+			SetCurOp();
+			Copy(curOp, memOp);
+			SetWindowText(hMEdit, L"M");
 		}
 		if (lParam == (LPARAM)hMr) {
-			//
+			if (!memIsEmpty) {
+				Copy(memOp, curOp);
+				SetTextCurOp();
+				SetEditText();
+			}
 		}
 		if (lParam == (LPARAM)hMplus) {
-			memIsEmpty = false;
+			if (!memIsEmpty) {
+				SetCurOp();
+				Add(memOp, curOp);
+				TryToCancel(memOp);
+			}
 		}
 
 
