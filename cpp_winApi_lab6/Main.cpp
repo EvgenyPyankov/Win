@@ -9,8 +9,8 @@ static TCHAR szTitle[] = _T("Calculator");
 HINSTANCE hInst;
 
 struct Op {         //operand
-	int nom;
-	int denom;
+	int nom;        //numerator
+	int denom;      //denominator
 	int sign;
 };
 
@@ -22,7 +22,7 @@ const int EDIT_HEIGHT = 50;
 const int MARGIN = 10;
 const int KEYBOARD_MARGIN_HEIGHT = 100;
 const int MAX_ENTER_LENGTH = 3;                //max number of digits you can enter
-const int MAX_LENGTH = MAX_ENTER_LENGTH*2;     // max number of digits in nominator/donominator
+const int MAX_LENGTH = MAX_ENTER_LENGTH*2;     // max number of digits in numerator/donominator
 
 HWND hWnd;
 HWND hEdit;
@@ -45,13 +45,13 @@ WCHAR curOpNomText[MAX_LENGTH+1], curOpDenomText[MAX_LENGTH + 1];
 WCHAR editText[MAX_LENGTH*2];
 
 int state;    // 1 - operand1, 2 - operator, 3 - operand2, 4 - =
-bool curOpState;   // 0 - nominator, 1 - denominator
+bool curOpState;   // 0 - numerator, 1 - denominator
 
 Op memOp;
 bool memIsEmpty = true;
 
-
-
+bool showDenom;
+bool isError;
 
 void SetStr(WCHAR *str, WCHAR *s) {
 	wsprintf(str, TEXT("%s"), s);
@@ -76,17 +76,37 @@ void AddDigitToStr(int digit) {
 		wsprintf(curOpDenomText, TEXT("%s%d"), curOpDenomText, digit);
 }
 
+void ChangeErrorStatus() {
+	if (isError) {
+		isError = false;
+		SetWindowText(hErrorEdit, L"");
+	}
+	else {
+		isError = true;
+		SetWindowText(hErrorEdit, L"E");
+	}
+	UpdateWindow(hWnd);
+}
+
 void SetEditText() {
 	if (curOp.sign == 1)
 		SetStr(editText, L"");
 	else
 		SetStr(editText, L"-");
 
-	if (!curOpState && wcslen(curOpDenomText)==0) {
-		AddStr(editText, curOpNomText);
+	if (showDenom) {
+		if (!curOpState && wcslen(curOpDenomText) == 0) {
+			AddStr(editText, curOpNomText);
+		}
+		else {
+			wsprintf(editText, TEXT("%s%s/%s"), editText, curOpNomText, curOpDenomText);
+		}
 	}
 	else {
-		wsprintf(editText, TEXT("%s%s/%s"), editText, curOpNomText, curOpDenomText);
+		if (((state == 1 || state == 3) && (curOpState)) || ((state == 2 || state == 4) && (wcslen(curOpDenomText) > 0) && (curOpDenomText[0] != '1')))
+			wsprintf(editText, TEXT("%s%s/%s"), editText, curOpNomText, curOpDenomText);
+		else
+			AddStr(editText, curOpNomText);
 	}
 	SetWindowText(hEdit, editText);
 	UpdateWindow(hWnd);
@@ -120,6 +140,7 @@ void ClearCurOp() {
 	SetStr(curOpDenomText, L"");
 	curOpState = false;
 	SetEditText();
+	if (isError) ChangeErrorStatus();
 }
 
 void Clear() {
@@ -131,9 +152,12 @@ void Clear() {
 void Init() {
 	Clear();
 	memIsEmpty = true;
+	showDenom = true;
+	isError = false;
 }
 
 void AddDigit(int digit) {
+	if (isError) ChangeErrorStatus();
 	switch (state)
 	{
 	case 1:
@@ -185,19 +209,22 @@ int ICM(int a, int b) {               // least common multiple
 	return (a*b) / GCD(a, b);
 }
 
-void Div(Op& op1, Op& op2) {
+bool Div(Op& op1, Op& op2) {
+	if (op2.nom == 0) return false;
 	op1.nom *= op2.denom;
 	op1.denom *= op2.nom;
 	op1.sign *= op2.sign;
+	return true;
 }
 
-void Mult(Op& op1, Op& op2) {
+bool Mult(Op& op1, Op& op2) {
 	op1.nom *= op2.nom;
 	op1.denom *= op2.denom;
 	op1.sign *= op2.sign;
+	return true;
 }
 
-void Add(Op& op1, Op& op2) {
+bool Add(Op& op1, Op& op2) {
 	int i = ICM(op1.denom, op2.denom);
 	int buf1 = i / op1.denom;
 	int buf2 = i / op2.denom;
@@ -209,11 +236,13 @@ void Add(Op& op1, Op& op2) {
 		op1.nom = abs(op1.nom);
 	}
 	op1.denom = i;
+	return true;
 }
 
-void Sub(Op& op1, Op& op2) {
+bool Sub(Op& op1, Op& op2) {
 	op2.sign *= -1;
 	Add(op1, op2);
+	return true;
 }
 
 void SetCurOp() {
@@ -233,27 +262,34 @@ void Equal() {
 	if (state!=1) {
 		state = 4;
 		SetCurOp();
+		bool check;
 		switch (curOperator)
 		{
 		case 1:
-			Div(op1, curOp);
+			check = Div(op1, curOp);
 			break;
 		case 2:
-			Mult(op1, curOp);
+			check = Mult(op1, curOp);
 			break;
 		case 3:
-			Sub(op1, curOp);
+			check =  Sub(op1, curOp);
 			break;
 		case 4:
-			Add(op1, curOp);
+			check = Add(op1, curOp);
 			break;
 		default:
 			break;
 		}
-		TryToCancel(op1);
-		Copy(op1, curOp);
-		SetTextCurOp();
-		SetEditText();
+		if (check) {
+			TryToCancel(op1);
+			Copy(op1, curOp);
+			SetTextCurOp();
+			SetEditText();
+		}
+		else { 
+			Clear();
+			ChangeErrorStatus();
+		}
 	}
 }
 
@@ -426,11 +462,13 @@ BOOL CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 
 
 
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	HDC hDc;
 	PAINTSTRUCT ps;
-	RECT rect = { 0,0,WIDTH, KEYBOARD_MARGIN_HEIGHT };
+	HMENU hMenu = GetMenu(hWnd);
+	WORD code;
 
 	switch (message)
 	{
@@ -444,23 +482,75 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		pInfo->ptMinTrackSize = Min;
 		pInfo->ptMaxTrackSize = Max;
 		return 0;
-
 	}
 	break;
-	case WM_CREATE:
+	case WM_CREATE: {
 		SetComponents(hWnd);
-		Init();	
-		break;
-	case WM_PAINT:
-	/*	rect = { 0,0,WIDTH,HEIGHT };
-		hDc = BeginPaint(hWnd, &ps);
-		FillRect(hDc, &rect, NULL);
-		EndPaint(hWnd, &ps);*/
-		break;
+		Init();
+	}
+	break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
 		break;
-	case WM_COMMAND:
+	case WM_KEYDOWN: {
+		code = LOWORD(wParam);
+		if (LOWORD(wParam) == 0x61)
+			AddDigit(1);
+		if (code == 0x30 || code == 0x60)
+			AddDigit(0);
+		if (code == 0x31 || code == 0x61)
+			AddDigit(1);
+		if (code == 0x32 || code == 0x62)
+			AddDigit(2);
+		if (code == 0x33 || code == 0x63)
+			AddDigit(3);
+		if (code == 0x34 || code == 0x64)
+			AddDigit(4);
+		if (code == 0x35 || code == 0x65)
+			AddDigit(5);
+		if (code == 0x36 || code == 0x66)
+			AddDigit(6);
+		if (code == 0x37 || code == 0x67)
+			AddDigit(7);
+		if (code == 0x38 || code == 0x68)
+			AddDigit(8);
+		if (code == 0x39 || code == 0x69)
+			AddDigit(9);
+		if (code == VK_DIVIDE) {
+			if ((state == 1 || state == 3) && (!curOpState)) {
+				curOpState = true;
+				SetEditText();
+			}
+			else SetOperator(1);
+		}
+		if (code == VK_MULTIPLY)
+			SetOperator(2);
+		if (code == VK_SUBTRACT)
+			SetOperator(3);
+		if (code == VK_ADD)
+			SetOperator(4);
+		if (code == VK_RETURN)
+			Equal();
+		if (code == VK_BACK)
+		{
+			if (!curOpState) {
+				int i = wcslen(curOpNomText);
+				if (i > 0) curOpNomText[i - 1] = 0;
+				if (i == 1) curOpNomText[0] = '0';
+				SetEditText();
+			}
+			else {
+				int i = wcslen(curOpDenomText);
+				if (i > 0) curOpDenomText[i - 1] = 0;
+				if (i == 1) curOpNomText[0] = '0';
+				SetEditText();
+			}
+		}
+		if (code == VK_DELETE)
+			Clear();
+	}
+	 break;
+	case WM_COMMAND: {
 
 		//menu items clicks
 
@@ -469,15 +559,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case ID_FILE_EXIT:
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			break;
+		case ID_OPTIONS_DON:
+			if (showDenom) {
+				showDenom = false;
+				CheckMenuItem(GetSubMenu(hMenu, 1), ID_OPTIONS_DON, MF_UNCHECKED);
+			}
+			else {
+				showDenom = true;
+				CheckMenuItem(GetSubMenu(hMenu, 1), ID_OPTIONS_DON, MF_CHECKED);
+			}
+			break;
 		case ID_INFO_ABOUT:
 			DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_DIALOG1), 0, (DlgProc), 0);
 			break;
-		//case ID_INFO_ABOUT:
-		//	//DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_DIALOG1), 0, (DlgProc), 0);
-		//	DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_DIALOG1), 0, (DlgProc), 0);
-		//	break;
 		}
-
 		//number button clicks
 
 		if (lParam == (LPARAM)hBtns[0]) {
@@ -549,11 +644,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		}
 		if (lParam == (LPARAM)hRev) {
 			if (wcslen(curOpDenomText) == 0) SetStr(curOpDenomText, L"1");
-				WCHAR buf[MAX_LENGTH*2];
-				SetStr(buf, curOpNomText);
-				SetStr(curOpNomText, curOpDenomText);
-				SetStr(curOpDenomText, buf);
-				SetEditText();
+			WCHAR buf[MAX_LENGTH * 2];
+			SetStr(buf, curOpNomText);
+			SetStr(curOpNomText, curOpDenomText);
+			SetStr(curOpDenomText, buf);
+			SetEditText();
 		}
 		if (lParam == (LPARAM)hDivE) {
 			if (curOpNomText[0] != '0') {
@@ -561,6 +656,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				SetStr(curOpDenomText, L"1");
 				SetEditText();
 			}
+			else ChangeErrorStatus();
 		}
 
 		if (lParam == (LPARAM)hMultE) {
@@ -604,7 +700,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				if (i == 1) curOpNomText[0] = '0';
 				SetEditText();
 			}
-		
+
 		}
 
 		//mem buttons clicks
@@ -613,12 +709,14 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 			memIsEmpty = true;
 			ClearOp(memOp);
 			SetWindowText(hMEdit, L"");
+			UpdateWindow(hWnd);
 		}
 		if (lParam == (LPARAM)hMs) {
 			memIsEmpty = false;
 			SetCurOp();
 			Copy(curOp, memOp);
 			SetWindowText(hMEdit, L"M");
+			UpdateWindow(hWnd);
 		}
 		if (lParam == (LPARAM)hMr) {
 			if (!memIsEmpty) {
@@ -634,12 +732,22 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				TryToCancel(memOp);
 			}
 		}
-		break;
+	}
+	break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
 		break;
+
 	}
+	SetFocus(hWnd);
 	return 0;
 }
 
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          
+
+
+
+
+
+
+
+
