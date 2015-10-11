@@ -89,7 +89,6 @@ void SetEditText() {
 		wsprintf(editText, TEXT("%s%s/%s"), editText, curOpNomText, curOpDenomText);
 	}
 	SetWindowText(hEdit, editText);
-	//InvalidateRect(hEdit, NULL, TRUE);
 	UpdateWindow(hWnd);
 }
 
@@ -426,8 +425,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	case WM_CREATE:
 		SetComponents(hWnd);
 		Init();	
-		/*wsprintf(curOpNomText, TEXT("%d"), INT_MAX);
-		SetEditText();*/
 		break;
 	case WM_PAINT:
 		hDc = BeginPaint(hWnd, &ps);
@@ -604,9 +601,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 				TryToCancel(memOp);
 			}
 		}
-
-
-
 		break;
 	default:
 		return DefWindowProc(hWnd, message, wParam, lParam);
