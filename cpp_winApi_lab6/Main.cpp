@@ -440,6 +440,8 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	return (int)msg.wParam;
 }
 
+// dialog window "about" callback function
+
 BOOL CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	switch (message)
 	{
@@ -459,7 +461,6 @@ BOOL CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
 	
 	return FALSE;
 }
-
 
 
 
@@ -494,8 +495,6 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		break;
 	case WM_KEYDOWN: {
 		code = LOWORD(wParam);
-		if (LOWORD(wParam) == 0x61)
-			AddDigit(1);
 		if (code == 0x30 || code == 0x60)
 			AddDigit(0);
 		if (code == 0x31 || code == 0x61)
