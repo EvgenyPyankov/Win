@@ -287,12 +287,12 @@ void SetOperator(int i) {
 
 
 void SetComponents(HWND hWnd) {
-	hEdit = CreateWindow(L"edit", L"", WS_CHILD | WS_VISIBLE | ES_RIGHT, MARGIN + 30, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT, WIDTH - 20 - 5 * MARGIN, EDIT_HEIGHT, hWnd, 0, hInst, NULL);
+	hEdit = CreateWindow(L"edit", L"", WS_CHILD | ES_READONLY |WS_VISIBLE | ES_RIGHT, MARGIN + 30, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT, WIDTH - 20 - 5 * MARGIN, EDIT_HEIGHT, hWnd, 0, hInst, NULL);
 	HFONT hFont = CreateFont(50, 0, 0, 0, FW_DONTCARE, FALSE, FALSE, FALSE, ANSI_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Arial");
 	SendMessage(hEdit, WM_SETFONT, WPARAM(hFont), TRUE);
 
-	hMEdit = CreateWindow(L"edit", L"", WS_CHILD | WS_VISIBLE, MARGIN, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT, 20, 20, hWnd, 0, hInst, NULL);
-	hErrorEdit = CreateWindow(L"edit", L"", WS_CHILD | WS_VISIBLE, MARGIN, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT+20, 20, 20, hWnd, 0, hInst, NULL);
+	hMEdit = CreateWindow(L"edit", L"", WS_CHILD | ES_READONLY | WS_VISIBLE, MARGIN, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT, 20, 20, hWnd, 0, hInst, NULL);
+	hErrorEdit = CreateWindow(L"edit", L"", WS_CHILD | ES_READONLY | WS_VISIBLE, MARGIN, KEYBOARD_MARGIN_HEIGHT - MARGIN - EDIT_HEIGHT+20, 20, 20, hWnd, 0, hInst, NULL);
 
 	//memory keys
 
@@ -338,6 +338,7 @@ void SetComponents(HWND hWnd) {
 
 
 LRESULT CALLBACK WndProc(HWND, UINT, WPARAM, LPARAM);
+BOOL CALLBACK DlgProc(HWND, UINT, WPARAM, LPARAM);
 
 int WINAPI WinMain(HINSTANCE hInstance,
 	HINSTANCE hPrevInstance,
@@ -403,6 +404,28 @@ int WINAPI WinMain(HINSTANCE hInstance,
 	return (int)msg.wParam;
 }
 
+BOOL CALLBACK DlgProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam) {
+	switch (message)
+	{
+	case WM_CLOSE:
+		EndDialog(hWnd, 0);
+		return FALSE;
+	case WM_COMMAND:
+		switch (LOWORD(wParam))
+		{
+		case IDOK:
+			EndDialog(hWnd, 0);
+			return FALSE;
+		}
+	default:
+		break;
+	}
+	
+	return FALSE;
+}
+
+
+
 LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
 	HDC hDc;
@@ -413,7 +436,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 	{
 	case WM_GETMINMAXINFO:
 	{
-		//forbid resize
+		//disable resize
 
 		MINMAXINFO *pInfo = (MINMAXINFO *)lParam;
 		POINT Min = { WIDTH,HEIGHT };
@@ -421,15 +444,18 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		pInfo->ptMinTrackSize = Min;
 		pInfo->ptMaxTrackSize = Max;
 		return 0;
+
 	}
+	break;
 	case WM_CREATE:
 		SetComponents(hWnd);
 		Init();	
 		break;
 	case WM_PAINT:
+	/*	rect = { 0,0,WIDTH,HEIGHT };
 		hDc = BeginPaint(hWnd, &ps);
 		FillRect(hDc, &rect, NULL);
-		EndPaint(hWnd, &ps);
+		EndPaint(hWnd, &ps);*/
 		break;
 	case WM_DESTROY:
 		PostQuitMessage(0);
@@ -443,6 +469,13 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 		case ID_FILE_EXIT:
 			PostMessage(hWnd, WM_CLOSE, 0, 0);
 			break;
+		case ID_INFO_ABOUT:
+			DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_DIALOG1), 0, (DlgProc), 0);
+			break;
+		//case ID_INFO_ABOUT:
+		//	//DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_DIALOG1), 0, (DlgProc), 0);
+		//	DialogBoxParam(hInst, MAKEINTRESOURCE(IDD_DIALOG1), 0, (DlgProc), 0);
+		//	break;
 		}
 
 		//number button clicks
